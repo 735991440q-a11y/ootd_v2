@@ -286,7 +286,11 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("File processing error:", err);
-      setAuthError(`处理失败: ${err.message || "请检查网络"}`);
+      if (err.message?.includes('429')) {
+        setAuthError("抱歉，API 配额已达上限（免费额度有限）。请稍候再试，或更换 API Key。");
+      } else {
+        setAuthError(`处理失败: ${err.message || "请检查网络"}`);
+      }
     } finally {
       setIsUploading(false);
       setIsInspLoading(false);
@@ -306,8 +310,13 @@ export default function App() {
       const recs = await getOutfitsForWeather(weatherDesc, Number(minTemp), Number(maxTemp), wardrobe, apiKey);
       setWeatherRecs(recs);
       localStorage.setItem(`outfits_data_${user.uid}`, JSON.stringify(recs));
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.message?.includes('429')) {
+        alert("抱歉，API 免费配额已达上限。Gemini 3.1 Pro 模型的免费次数非常有限，建议稍后再试或在“设置”中尝试更换 Key。");
+      } else {
+        alert("生成失败，请检查网络或稍后再试。");
+      }
     } finally {
       setIsRecLoading(false);
     }

@@ -49,7 +49,7 @@ export async function identifyClothing(base64Image: string, apiKey: string, cate
 
 export async function getOutfitsForWeather(weather: string, minTemp: number, maxTemp: number, wardrobe: any[], apiKey: string) {
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-3.1-pro-preview";
+  const model = "gemini-3-flash-preview";
   const systemInstruction = `
     你是穿搭助手。根据天气和给定的气温区间推荐2套。
     温度逻辑：
@@ -97,7 +97,7 @@ export async function getOutfitsForWeather(weather: string, minTemp: number, max
 
 export async function getSingleItemOutfits(item: any, wardrobe: any[], apiKey: string) {
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-3.1-pro-preview";
+  const model = "gemini-3-flash-preview";
   const systemInstruction = `
     你是穿搭助手。用户上传了一件单品，请给出穿搭建议。
     输出两部分：
