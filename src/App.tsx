@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Camera, Cloud, Sparkles, Shirt, Trash2, Plus, 
   ChevronRight, Thermometer, Wind, Loader2, LogIn, LogOut,
-  MapPin, Check, X, Info, User as UserIcon, Settings, Key
+  MapPin, Check, X, Info, User as UserIcon, Settings, Key,
+  RefreshCw, Copy, Download, Upload, Database
 } from 'lucide-react';
 import { identifyClothing, getOutfitsForWeather, getSingleItemOutfits } from './lib/gemini';
 import { clsx, type ClassValue } from 'clsx';
@@ -128,6 +129,11 @@ export default function App() {
   const [nickname, setNickname] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+  const [syncInput, setSyncInput] = useState('');
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -303,6 +309,68 @@ export default function App() {
     saveLocalWardrobe(user.uid, updated);
   };
 
+  const handleExport = () => {
+    const data = {
+      wardrobe,
+      categories,
+      version: '1.0'
+    };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    navigator.clipboard.writeText(encoded).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
+
+  const handleImport = (mode: 'merge' | 'overwrite') => {
+    if (!user || !syncInput.trim()) return;
+    try {
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(syncInput.trim()))));
+      const importedWardrobe = decoded.wardrobe as ClothingItem[];
+      const importedCategories = decoded.categories as string[];
+
+      if (mode === 'overwrite') {
+        saveLocalWardrobe(user.uid, importedWardrobe);
+        saveLocalCategories(user.uid, importedCategories);
+      } else {
+        // Smart Merge: Deduplicate by Image URL
+        const existingUrls = new Set(wardrobe.map(i => i.imageUrl));
+        const newItems = importedWardrobe.filter(item => !existingUrls.has(item.imageUrl));
+        const addedCount = newItems.length;
+        
+        const mergedWardrobe = [...wardrobe, ...newItems.map(item => ({
+          ...item,
+          id: 'item_' + Math.random().toString(36).substr(2, 9), // Fresh IDs
+          userId: user.uid,
+          createdAt: Date.now()
+        }))];
+        
+        const mergedCategories = Array.from(new Set([...categories, ...importedCategories]));
+        
+        saveLocalWardrobe(user.uid, mergedWardrobe);
+        saveLocalCategories(user.uid, mergedCategories);
+        
+        setSyncInput('');
+        setSyncStatus(`智能合并完成，新增了 ${addedCount} 件唯一单品`);
+        setTimeout(() => {
+          setIsSyncModalOpen(false);
+          setSyncStatus(null);
+        }, 2000);
+        return;
+      }
+      
+      setSyncInput('');
+      setSyncStatus("数据已完全覆盖");
+      setTimeout(() => {
+        setIsSyncModalOpen(false);
+        setSyncStatus(null);
+      }, 2000);
+    } catch (err) {
+      setSyncStatus("无效的编码串");
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  };
+
   const generateWeatherRecs = async () => {
     if (!user) return;
     setIsRecLoading(true);
@@ -399,6 +467,121 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Sync & Merge Modal */}
+      <AnimatePresence>
+        {isSyncModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSyncModalOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-natural-border overflow-hidden"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-natural-dark">数据同步与备份</h3>
+                </div>
+                <button onClick={() => setIsSyncModalOpen(false)} className="text-natural-muted hover:text-rose-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                {syncStatus && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-natural-dark text-white text-[10px] font-bold py-2 px-4 rounded-full text-center tracking-tight"
+                  >
+                    {syncStatus}
+                  </motion.div>
+                )}
+                {/* Export Section */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-natural-muted uppercase px-1 tracking-widest">导出当前衣橱</p>
+                  <button 
+                    onClick={handleExport}
+                    className="w-full bg-natural-sidebar/50 border border-natural-border/30 rounded-2xl p-4 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <Download className="w-4 h-4 text-natural-primary" />
+                      </div>
+                      <span className="text-sm font-bold text-natural-dark">复制导出编码</span>
+                    </div>
+                    {copySuccess ? (
+                      <Check className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-natural-muted group-hover:text-natural-primary" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="h-px bg-natural-bg" />
+
+                {/* Import Section */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-bold text-natural-muted uppercase px-1 tracking-widest">导入外部数据</p>
+                  <textarea 
+                    placeholder="粘贴数据编码到这里..."
+                    value={syncInput}
+                    onChange={(e) => setSyncInput(e.target.value)}
+                    className="w-full bg-natural-sidebar/30 border-none rounded-2xl px-5 py-4 text-xs h-24 focus:ring-2 focus:ring-natural-primary transition-all resize-none"
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => handleImport('merge')}
+                      disabled={!syncInput.trim()}
+                      className="bg-white border border-natural-border text-natural-dark font-bold py-3.5 rounded-2xl text-xs hover:bg-natural-sidebar transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> 智能合并
+                    </button>
+                    {showOverwriteConfirm ? (
+                      <div className="flex gap-2 w-full animate-in fade-in zoom-in duration-200">
+                        <button 
+                          onClick={() => {
+                            handleImport('overwrite');
+                            setShowOverwriteConfirm(false);
+                          }}
+                          className="flex-1 bg-rose-600 text-white font-bold py-3.5 rounded-2xl text-[10px] hover:bg-rose-700 transition-all"
+                        >
+                          确认覆盖
+                        </button>
+                        <button 
+                          onClick={() => setShowOverwriteConfirm(false)}
+                          className="flex-1 bg-natural-bg text-natural-muted font-bold py-3.5 rounded-2xl text-[10px] hover:bg-natural-sidebar transition-all"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setShowOverwriteConfirm(true)}
+                        disabled={!syncInput.trim()}
+                        className="w-full bg-rose-50 border border-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl text-xs hover:bg-rose-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <Loader2 className="w-3.5 h-3.5" /> 完全覆盖
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="sticky top-0 z-40 bg-natural-sidebar/90 backdrop-blur-md border-b border-natural-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -410,7 +593,14 @@ export default function App() {
             <p className="text-[10px] text-natural-muted font-bold uppercase tracking-widest leading-none">Hello, {user.displayName}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button 
+            onClick={() => setIsSyncModalOpen(true)}
+            className="p-2 text-natural-muted hover:text-natural-primary transition-colors flex items-center gap-1.5"
+            title="数据同步"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 text-natural-muted hover:text-natural-primary transition-colors"
