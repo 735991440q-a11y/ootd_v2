@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-natural-bg: #FAF9F6;
+  --color-natural-text: #4A4A40;
+  --color-natural-sidebar: #F0EDE9;
+  --color-natural-border: #D9D4CC;
+  --color-natural-primary: #5A5A40;
+  --color-natural-muted: #8C8C7F;
+  --color-natural-dark: #2A2A20;
+
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+}

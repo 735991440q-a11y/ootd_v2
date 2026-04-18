@@ -1,0 +1,8 @@
+{
+  "name": "衣橱助手 OOTD Advisor",
+  "description": "您的智能穿搭管家：支持 AI 识别、天气推荐与搭配灵感。本地存储方案，无需账号，数据私有。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
