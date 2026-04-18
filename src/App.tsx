@@ -223,6 +223,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isAllCategoriesOpen, setIsAllCategoriesOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
@@ -778,7 +779,7 @@ export default function App() {
             <Shirt className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-natural-dark text-lg tracking-tight">衣橱助手</h1>
+            <h1 className="font-bold text-natural-dark text-lg tracking-tight">不准裸奔</h1>
             <p className="text-[10px] text-natural-muted font-bold uppercase tracking-widest leading-none">Hello, {user.displayName}</p>
           </div>
         </div>
@@ -812,12 +813,19 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-6"
             >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
                   <div className="w-1 h-5 bg-natural-primary rounded-full transition-all" />
                   <h2 className="text-xl font-bold text-natural-dark">我的衣橱</h2>
+                  <label className="w-7 h-7 bg-natural-primary/10 rounded-lg flex items-center justify-center text-natural-primary cursor-pointer hover:bg-natural-primary hover:text-white transition-all active:scale-90">
+                    <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => handleFileUpload(e, 'add')} disabled={isUploading} />
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  </label>
                 </div>
-                <span className="text-sm font-medium text-natural-muted">{wardrobe.length} 件单品</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-bold text-natural-dark leading-none">{wardrobe.length}</span>
+                  <span className="text-[8px] font-bold text-natural-muted uppercase tracking-tighter">Items</span>
+                </div>
               </div>
 
               {/* Stats Grid */}
@@ -851,44 +859,67 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              </div>
 
-              {/* Add Category Section */}
-              <div className="bg-white rounded-3xl p-4 border border-natural-border shadow-sm mb-6">
-                <p className="text-[10px] font-bold text-natural-muted uppercase px-1 mb-2">管理分类</p>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="新增分类 (如：裙子)" 
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    className="flex-1 bg-natural-sidebar/30 border-none rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-natural-primary"
-                  />
-                  <button 
-                    onClick={addCategory}
-                    className="bg-natural-primary text-white p-2 rounded-xl hover:opacity-90 transition-all"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {categories.map(cat => (
-                    <span key={cat} className="text-[10px] font-bold text-natural-muted bg-natural-sidebar px-2 py-1 rounded-md">{cat}</span>
-                  ))}
+                {/* Concise Add Category Button/Input */}
+                <div className="bg-white rounded-2xl p-2.5 border border-natural-border/60 shadow-sm">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <p className="text-[9px] font-bold text-natural-muted uppercase tracking-tighter">管理分类</p>
+                    <button 
+                      onClick={() => setIsAddingCategory(!isAddingCategory)}
+                      className="text-[9px] font-bold text-natural-primary"
+                    >
+                      {isAddingCategory ? "取消" : "新增 +"}
+                    </button>
+                  </div>
+                  
+                  {isAddingCategory && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      className="flex gap-1.5 mb-2 overflow-hidden"
+                    >
+                      <input 
+                        autoFocus
+                        type="text" 
+                        placeholder="分类名" 
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            addCategory();
+                            setIsAddingCategory(false);
+                          }
+                          if (e.key === 'Escape') setIsAddingCategory(false);
+                        }}
+                        className="flex-1 bg-natural-sidebar/30 border-none rounded-lg px-3 py-1.5 text-xs focus:ring-0"
+                      />
+                      <button 
+                        onClick={() => { addCategory(); setIsAddingCategory(false); }}
+                        className="bg-natural-primary text-white px-2.5 rounded-lg active:scale-95 transition-transform"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </motion.div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1">
+                    {categories.map(cat => (
+                      <span 
+                        key={cat} 
+                        onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                        className={cn(
+                          "text-[8px] font-bold px-1.5 py-0.5 rounded-md transition-all cursor-pointer",
+                          selectedCategory === cat 
+                            ? "bg-natural-primary text-white" 
+                            : "text-natural-muted bg-natural-sidebar hover:bg-natural-border/20"
+                        )}
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {/* Upload Card */}
-              <label className="relative group overflow-hidden bg-white border border-natural-border rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-natural-primary transition-all active:scale-[0.98] shadow-sm">
-                <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => handleFileUpload(e, 'add')} disabled={isUploading} />
-                <div className="w-14 h-14 bg-natural-sidebar rounded-2xl flex items-center justify-center text-natural-primary group-hover:bg-natural-primary group-hover:text-white transition-colors">
-                  {isUploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Plus className="w-7 h-7" />}
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-natural-dark text-lg">识别新单品</p>
-                  <p className="text-sm text-natural-muted">AI 智能提取类别与风格属性</p>
-                </div>
-              </label>
 
               {/* Wardrobe Grid */}
               <div className="grid grid-cols-2 gap-4">
