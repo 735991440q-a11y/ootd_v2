@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Camera, Cloud, Sparkles, Shirt, Trash2, Plus, 
@@ -40,12 +40,27 @@ interface LocalUser {
 }
 
 // --- Helper Components ---
-function StatCard({ num, label }: { num: number, label: string, key?: React.Key }) {
+function StatCard({ num, label, active, onClick }: { num: number, label: string, active?: boolean, onClick?: () => void, key?: React.Key }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-natural-border/30 shadow-sm flex flex-col items-center">
-      <span className="text-2xl font-light text-natural-primary">{num}</span>
-      <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest mt-1">{label}</span>
-    </div>
+    <button 
+      onClick={onClick}
+      className={cn(
+        "p-4 rounded-3xl border transition-all flex flex-col items-center justify-center gap-1 group overflow-hidden relative",
+        active 
+          ? "bg-natural-primary border-natural-primary text-white shadow-lg shadow-natural-primary/25" 
+          : "bg-white border-natural-border/30 text-natural-dark shadow-sm hover:border-natural-primary/50"
+      )}
+    >
+      {active && (
+        <motion.div 
+          layoutId="stat-active" 
+          className="absolute inset-0 bg-natural-primary -z-10" 
+          transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+        />
+      )}
+      <span className={cn("text-2xl font-light tracking-tight", active ? "text-white" : "text-natural-primary")}>{num}</span>
+      <span className={cn("text-[8px] font-extrabold uppercase tracking-widest", active ? "text-white/80" : "text-natural-muted group-hover:text-natural-primary")}>{label}</span>
+    </button>
   );
 }
 
@@ -104,12 +119,110 @@ function FeatureItem({ icon, label }: { icon: React.ReactNode, label: string }) 
   );
 }
 
+function ClothingCard({ 
+  item, categories, isDeleting, onUpdateCategory, onDelete, onDeleteRequest, onCancelDelete 
+}: { 
+  item: ClothingItem, categories: string[], isDeleting: boolean,
+  onUpdateCategory: (id: string, cat: string) => void,
+  onDelete: () => void,
+  onDeleteRequest: () => void,
+  onCancelDelete: () => void,
+  key?: React.Key
+}) {
+  const [isPressing, setIsPressing] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startPress = () => {
+    setIsPressing(true);
+    timerRef.current = setTimeout(() => {
+      onDeleteRequest();
+      setIsPressing(false);
+    }, 800);
+  };
+
+  const endPress = () => {
+    setIsPressing(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  };
+
+  return (
+    <motion.div 
+      layout
+      onMouseDown={startPress}
+      onMouseUp={endPress}
+      onMouseLeave={endPress}
+      onTouchStart={startPress}
+      onTouchEnd={endPress}
+      className={cn(
+        "bg-white rounded-2xl p-3 shadow-sm border transition-all relative select-none cursor-pointer",
+        isDeleting ? "border-rose-200 ring-2 ring-rose-100" : "border-natural-border/30",
+        isPressing && "brightness-95"
+      )}
+      animate={isPressing ? { 
+        rotate: [-0.5, 0.5, -0.5, 0.5, 0],
+        scale: 0.98
+      } : { rotate: 0, scale: 1 }}
+      transition={isPressing ? { repeat: Infinity, duration: 0.15 } : { duration: 0.2 }}
+    >
+      <div className="aspect-[4/5] bg-natural-sidebar rounded-xl overflow-hidden mb-3 relative pointer-events-none">
+        <img src={item.imageUrl} alt={item.category} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        
+        <AnimatePresence>
+          {isDeleting && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-rose-500/90 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
+            >
+              <Trash2 className="w-8 h-8 text-white mb-2" />
+              <p className="text-[10px] font-extrabold text-white uppercase tracking-widest mb-4">确认删除？</p>
+              <div className="flex flex-col gap-2 w-full">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  className="w-full py-2 bg-white text-rose-600 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm active:scale-95 transition-transform"
+                >
+                  是的，删除
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onCancelDelete(); }}
+                  className="w-full py-2 bg-rose-400/30 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-transform"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <div className="px-1">
+        <div className="flex items-center justify-between mb-1" onClick={e => e.stopPropagation()}>
+          <select 
+            value={item.category}
+            onChange={(e) => onUpdateCategory(item.id, e.target.value)}
+            className="text-[10px] font-bold text-natural-primary bg-natural-sidebar px-1 py-0.5 rounded-full border-none focus:ring-0 cursor-pointer appearance-none"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <span className="text-[10px] font-medium text-natural-muted">{item.style}</span>
+        </div>
+        <p className="text-sm font-bold text-natural-dark truncate">{item.color}款</p>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'wardrobe' | 'weather' | 'inspiration'>('wardrobe');
   const [wardrobe, setWardrobe] = useState<ClothingItem[]>([]);
   const [categories, setCategories] = useState<string[]>(['上衣', '裤子', '外套', '鞋']);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isAllCategoriesOpen, setIsAllCategoriesOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
@@ -135,6 +248,23 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Dynamic Categories Sorting (Most items first)
+  const sortedCategories = useMemo(() => {
+    const counts = categories.map(cat => ({
+      name: cat,
+      count: wardrobe.filter(i => i.category === cat).length
+    }));
+    return counts.sort((a, b) => b.count - a.count);
+  }, [categories, wardrobe]);
+
+  const topCategories = useMemo(() => sortedCategories.slice(0, 4), [sortedCategories]);
+
+  // Filtered Wardrobe
+  const filteredWardrobe = useMemo(() => {
+    if (!selectedCategory) return wardrobe;
+    return wardrobe.filter(item => item.category === selectedCategory);
+  }, [wardrobe, selectedCategory]);
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem('wardrobe_api_key');
@@ -467,6 +597,65 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* All Categories Modal */}
+      <AnimatePresence>
+        {isAllCategoriesOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAllCategoriesOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-natural-border"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-natural-sidebar rounded-xl text-natural-primary">
+                    <Shirt className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-natural-dark">所有分类</h3>
+                </div>
+                <button onClick={() => setIsAllCategoriesOpen(false)} className="text-natural-muted hover:text-rose-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <button 
+                  onClick={() => { setSelectedCategory(null); setIsAllCategoriesOpen(false); }}
+                  className={cn(
+                    "p-3 rounded-2xl border text-left flex justify-between items-center transition-all",
+                    !selectedCategory ? "bg-natural-primary border-natural-primary text-white shadow-md" : "bg-white border-natural-border/30 hover:border-natural-primary"
+                  )}
+                >
+                  <span className="text-xs font-bold">全部衣橱</span>
+                  <span className="text-xs opacity-60">{wardrobe.length}</span>
+                </button>
+                {sortedCategories.map(cat => (
+                  <button 
+                    key={cat.name}
+                    onClick={() => { setSelectedCategory(cat.name); setIsAllCategoriesOpen(false); }}
+                    className={cn(
+                      "p-3 rounded-2xl border text-left flex justify-between items-center transition-all",
+                      selectedCategory === cat.name ? "bg-natural-primary border-natural-primary text-white shadow-md" : "bg-white border-natural-border/30 hover:border-natural-primary"
+                    )}
+                  >
+                    <span className="text-xs font-bold truncate pr-1">{cat.name}</span>
+                    <span className="text-xs opacity-60">{cat.count}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Sync & Merge Modal */}
       <AnimatePresence>
         {isSyncModalOpen && (
@@ -631,11 +820,37 @@ export default function App() {
                 <span className="text-sm font-medium text-natural-muted">{wardrobe.length} 件单品</span>
               </div>
 
-              {/* Stats Grid (Inspired by Theme) */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {categories.slice(0, 4).map(cat => (
-                  <StatCard key={cat} num={wardrobe.filter(i => i.category === cat).length} label={cat} />
-                ))}
+              {/* Stats Grid */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-bold text-natural-muted uppercase tracking-widest">关键分类</p>
+                  <button 
+                    onClick={() => setIsAllCategoriesOpen(true)}
+                    className="text-[10px] font-bold text-natural-primary flex items-center gap-1 hover:opacity-80 transition-all"
+                  >
+                    查看全部 ({categories.length}) <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {topCategories.map(cat => (
+                    <StatCard 
+                      key={cat.name} 
+                      num={cat.count} 
+                      label={cat.name} 
+                      active={selectedCategory === cat.name}
+                      onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+                    />
+                  ))}
+                  {selectedCategory && (
+                    <button 
+                      onClick={() => setSelectedCategory(null)}
+                      className="col-span-2 py-2 text-[10px] font-bold text-natural-muted border border-dashed border-natural-border rounded-xl hover:bg-natural-sidebar transition-all flex items-center justify-center gap-2"
+                    >
+                      <X className="w-3 h-3" /> 清除筛选: {selectedCategory}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Add Category Section */}
@@ -677,38 +892,28 @@ export default function App() {
 
               {/* Wardrobe Grid */}
               <div className="grid grid-cols-2 gap-4">
-                {wardrobe.map((item) => (
-                  <motion.div 
-                    layout
-                    key={item.id} 
-                    className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-natural-border/30 group relative"
-                  >
-                    <div className="aspect-[4/5] bg-natural-sidebar rounded-xl overflow-hidden mb-3 relative">
-                      <img src={item.imageUrl} alt={item.category} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      <button 
-                        onClick={() => deleteItem(item.id)}
-                        className="absolute top-2 right-2 p-1.5 bg-white/90 shadow-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-rose-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                {filteredWardrobe.length === 0 ? (
+                  <div className="col-span-2 py-20 text-center space-y-3">
+                    <div className="w-16 h-16 bg-natural-sidebar rounded-full flex items-center justify-center mx-auto text-natural-muted/30">
+                      <Shirt className="w-8 h-8" />
                     </div>
-                    <div className="px-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <select 
-                          value={item.category}
-                          onChange={(e) => updateItemCategory(item.id, e.target.value)}
-                          className="text-[10px] font-bold text-natural-primary bg-natural-sidebar px-1 py-0.5 rounded-full border-none focus:ring-0 cursor-pointer appearance-none"
-                        >
-                          {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                        <span className="text-[10px] font-medium text-natural-muted">{item.style}</span>
-                      </div>
-                      <p className="text-sm font-bold text-natural-dark truncate">{item.color}款</p>
-                    </div>
-                  </motion.div>
-                ))}
+                    <p className="text-sm font-bold text-natural-muted">该分类下暂无单品</p>
+                    <button onClick={() => setSelectedCategory(null)} className="text-xs text-natural-primary font-bold">查看全部衣橱</button>
+                  </div>
+                ) : (
+                  filteredWardrobe.map((item) => (
+                    <ClothingCard 
+                      key={item.id} 
+                      item={item} 
+                      categories={categories}
+                      isDeleting={deletingId === item.id}
+                      onUpdateCategory={updateItemCategory}
+                      onDelete={() => deleteItem(item.id)}
+                      onDeleteRequest={() => setDeletingId(item.id)}
+                      onCancelDelete={() => setDeletingId(null)}
+                    />
+                  ))
+                )}
               </div>
             </motion.div>
           )}
