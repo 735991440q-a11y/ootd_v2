@@ -502,11 +502,11 @@ export default function App() {
     }
   };
 
-  const generateWeatherRecs = async () => {
+  const generateWeatherRecs = async (styleInstructions?: string) => {
     if (!user) return;
     setIsRecLoading(true);
     try {
-      const recs = await getOutfitsForWeather(weatherDesc, Number(minTemp), Number(maxTemp), wardrobe, apiKey);
+      const recs = await getOutfitsForWeather(weatherDesc, Number(minTemp), Number(maxTemp), wardrobe, apiKey, styleInstructions);
       setWeatherRecs(recs);
       localStorage.setItem(`outfits_data_${user.uid}`, JSON.stringify(recs));
     } catch (err: any) {
@@ -519,6 +519,13 @@ export default function App() {
     } finally {
       setIsRecLoading(false);
     }
+  };
+
+  const handleRefreshWeather = () => {
+    if (!weatherRecs) return;
+    const currentTitles = weatherRecs.recommendations.map((r: any) => r.title).join('、');
+    const instruction = `请生成与以下风格完全不同的推荐：${currentTitles}。尝试一些新的混搭、色彩方案或风格定位（如：从甜美转为极简，或从运动转为正式）。`;
+    generateWeatherRecs(instruction);
   };
 
   if (loading) return (
@@ -1058,6 +1065,19 @@ export default function App() {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Refresh Button */}
+                  <div className="pt-2">
+                    <button 
+                      onClick={handleRefreshWeather}
+                      disabled={isRecLoading}
+                      className="w-full bg-natural-sidebar border border-natural-border/50 text-natural-primary rounded-2xl py-4 font-bold flex items-center justify-center gap-2 hover:bg-natural-border/20 transition-all active:scale-[0.98]"
+                    >
+                      {isRecLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                      换一套 (Refresh)
+                    </button>
+                    <p className="text-[9px] text-center text-natural-muted mt-2 font-bold uppercase tracking-widest leading-none">AI 将尝试生成与当前截然不同的风格</p>
+                  </div>
                 </div>
               )}
             </motion.div>

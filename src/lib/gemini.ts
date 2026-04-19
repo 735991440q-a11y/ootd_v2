@@ -47,7 +47,7 @@ export async function identifyClothing(base64Image: string, apiKey: string, cate
   return JSON.parse(response.text || "{}");
 }
 
-export async function getOutfitsForWeather(weather: string, minTemp: number, maxTemp: number, wardrobe: any[], apiKey: string) {
+export async function getOutfitsForWeather(weather: string, minTemp: number, maxTemp: number, wardrobe: any[], apiKey: string, styleInstructions?: string) {
   const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-3-flash-preview";
   const systemInstruction = `
@@ -57,6 +57,9 @@ export async function getOutfitsForWeather(weather: string, minTemp: number, max
     请根据最高和最低温的平均值以及天气情况进行决策。
     输出格式包含纯文字描述和搭配意象图描述。
     注意：在推荐时，必须从衣橱内容中检索最匹配的单品，并将该单品的id填入对应的ID字段。如果没有找到合适的单品，该ID字段应留空。
+
+    ${styleInstructions ? `特别风格要求：${styleInstructions}` : ''}
+
     输出JSON格式：{ 
       weatherAnalysis: string, 
       recommendations: [{ 
